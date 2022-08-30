@@ -1,0 +1,143 @@
+---
+title: "Practical Machine Learning Project"
+author: "Katie T"
+date: "8/19/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Executive Summary
+In this analysis, we will be building a model to predict the manner (classe) in which a user exercises using data of accelerometers on the belt, forearm, arm, and dumbbell of 6 participants. We tested three different methods(random forest, gradient boosting machine, and linear discriminant analysis) and found our random forest model preforms best. Finally we applied this model to the data set pml-testing to predict the manner in which the users performed the exercises.
+
+## Exploratory Analysis
+
+Graph 1 shows the frequency of the classe variable. From this we see that A is the most common outcome for classe in our data set. 
+
+```{r include=FALSE}
+
+library(caret)
+```
+
+```{r echo=FALSE}
+set.seed(125)
+#Load Data
+pml <- read.csv("C:\\Users\\kathe\\OneDrive\\Documents\\Coursera\\Practical_Machine_Learning\\Project\\pml-training.csv")
+
+
+plot(as.factor(pml$classe),main='Graph 1: Classe Frequency',xlab='Classe',ylab='Frequency' )
+```
+
+Further we see that the aggregated variables are mostly missing so we will remove these for the analysis. This leaves the following columns for the analysis:
+```{r echo=FALSE}
+
+
+cleandata <- pml[,
+                 c
+                 ("roll_belt","pitch_belt","yaw_belt","total_accel_belt","gyros_belt_x","gyros_belt_y"
+                   ,"gyros_belt_z","accel_belt_x","accel_belt_y","accel_belt_z","magnet_belt_x","magnet_belt_y"
+                   ,"magnet_belt_z","roll_arm","pitch_arm","yaw_arm","total_accel_arm","gyros_arm_x"
+                   ,"gyros_arm_y","gyros_arm_z","accel_arm_x","accel_arm_y","accel_arm_z","magnet_arm_x"
+                   ,"magnet_arm_y","magnet_arm_z","roll_dumbbell","pitch_dumbbell","yaw_dumbbell"
+                   ,"total_accel_dumbbell","gyros_dumbbell_x","gyros_dumbbell_y","gyros_dumbbell_z"
+                   ,"accel_dumbbell_x","accel_dumbbell_y","accel_dumbbell_z","magnet_dumbbell_x"
+                   ,"magnet_dumbbell_y","magnet_dumbbell_z","roll_forearm","pitch_forearm","yaw_forearm"
+                   ,"total_accel_forearm","gyros_forearm_x","gyros_forearm_y","gyros_forearm_z"
+                   ,"accel_forearm_x","accel_forearm_y","accel_forearm_z","magnet_forearm_x"
+                   ,"magnet_forearm_y","magnet_forearm_z","classe")]
+colnames(cleandata)
+
+```
+## Method 
+
+We create a training and testing sets with the training set consisting of 70% of the data set. We will use cross-validation within model to uses to compare the models. The test set will be used to do a final validation on the chosen model. Next, we preprocess the data using principal component analysis with p=.7. We will then use this data to run the three models as well as use the same method to preprocess the testing set. We  also use trainControl function with method="cv"and number=10 in order to use in each of the models to preform cross validation.
+```{r echo=FALSE}
+trainSeg <- createDataPartition(cleandata$classe, p=.7,list=FALSE)
+training<-cleandata[trainSeg,]
+testing<-cleandata[-trainSeg,]
+preProc<-preProcess(training, method="pca",.8)
+trainPC<-predict(preProc, training)
+testPC<-predict(preProc,testing)
+ctrl<-trainControl(method="cv", number=10)
+```
+
+
+### Random Forest
+
+We first create a random forest model using the new training set. 
+
+```{r echo=FALSE}
+modelFitrf<-train(classe~ ., method="rf", data=trainPC,trControl=ctrl)
+modelFitrf$finalModel
+
+```
+### Gradient Boosting Machine
+
+Next, we create a model using gradient boosting machine. 
+```{r include=FALSE}
+modelFitgbm<-train(classe~ .
+                  , method="gbm", data=trainPC, trControl=ctrl)
+```
+```{r echo=FALSE}
+modelFitgbm$finalModel
+
+```
+### Linear Discriminant Analysis
+Finally we create a model using linear discriminant analysis.
+```{r echo=FALSE}
+modelFitlda<-train(classe~ .
+                   , method="lda", data=trainPC, trControl=ctrl)
+modelFitlda$finalModel
+
+```
+### Model Comparison and Evaluation
+
+Looking at the confusion matrices from the cross-validation we see that random forest model has the highest accuracy and
+thus the lowest out of sample error (1-accuracy). For this reason we will use the random forest model.
+
+Random Forest:
+```{r echo=FALSE}
+confusionMatrix.train(modelFitrf)
+```
+Gradient Boosting Machine Test Set:
+```{r echo=FALSE}
+confusionMatrix.train(modelFitgbm)
+```
+Linear Discriminant Analysis Test Set:
+```{r echo=FALSE}
+confusionMatrix.train(modelFitlda)
+```
+
+### Model Evaluation
+
+To evaluate our model we will run the model on the preprocessed test set. From the confusion matrix below we see that the model has a 96% accuracy on the test set with an out of sample error of 0.4. It also does a good job at predicting all the class types.
+```{r echo=FALSE}
+rf<-confusionMatrix(as.factor(testing$classe),as.factor(predict(modelFitrf$finalModel, testPC)))
+rf
+```
+
+### Model Application 
+Finally we will use the model to predict using the data set pml-testing which produces the following output:
+```{r echo=FALSE}
+pmltestcase <-read.csv("C:\\Users\\kathe\\OneDrive\\Documents\\Coursera\\Practical_Machine_Learning\\Project\\pml-testing.csv")
+
+cleanpmltest <- pmltestcase[,
+                 c
+                 ("roll_belt","pitch_belt","yaw_belt","total_accel_belt","gyros_belt_x","gyros_belt_y"
+                   ,"gyros_belt_z","accel_belt_x","accel_belt_y","accel_belt_z","magnet_belt_x","magnet_belt_y"
+                   ,"magnet_belt_z","roll_arm","pitch_arm","yaw_arm","total_accel_arm","gyros_arm_x"
+                   ,"gyros_arm_y","gyros_arm_z","accel_arm_x","accel_arm_y","accel_arm_z","magnet_arm_x"
+                   ,"magnet_arm_y","magnet_arm_z","roll_dumbbell","pitch_dumbbell","yaw_dumbbell"
+                   ,"total_accel_dumbbell","gyros_dumbbell_x","gyros_dumbbell_y","gyros_dumbbell_z"
+                   ,"accel_dumbbell_x","accel_dumbbell_y","accel_dumbbell_z","magnet_dumbbell_x"
+                   ,"magnet_dumbbell_y","magnet_dumbbell_z","roll_forearm","pitch_forearm","yaw_forearm"
+                   ,"total_accel_forearm","gyros_forearm_x","gyros_forearm_y","gyros_forearm_z"
+                   ,"accel_forearm_x","accel_forearm_y","accel_forearm_z","magnet_forearm_x"
+                   ,"magnet_forearm_y","magnet_forearm_z")]
+testcasePC<-predict(preProc,cleanpmltest)
+testcase<-predict(modelFitrf$finalModel, testcasePC)
+testcase
+```
+ 
